@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8" />
+    <title>Bingo 統計查詢</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+        th { background-color: #f0f0f0; }
+        input[type="date"], select { padding: 6px; font-size: 1rem; }
+        button { padding: 6px 12px; font-size: 1rem; }
+        .no-data { margin-top: 20px; color: red; }
+    </style>
+</head>
+<body>
+    <h1>Bingo 統計查詢介面</h1>
+
+    <form method="post">
+        <label for="date">選擇日期：</label>
+        <input type="date" id="date" name="date" value="{{ selected_date or '' }}" required />
+        
+        <label for="category">類別：</label>
+        <select id="category" name="category">
+            {% for cat in categories %}
+                <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit">查詢</button>
+    </form>
+
+    {% if results is not none and not results.empty %}
+        <h2>日期: {{ selected_date }}</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>期數</th>
+                    <th>類別</th>
+                    <th>組合號碼</th>
+                    <th>出現次數</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in results.itertuples() %}
+                <tr>
+                    <td>{{ row.期數 }}</td>
+                    <td>{{ row.類別 }}</td>
+                    <td>{{ row.組合號碼 }}</td>
+                    <td>{{ row.出現次數 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% elif selected_date %}
+        <div class="no-data">找不到日期 {{ selected_date }} 的資料。</div>
+    {% endif %}
+</body>
+</html>
