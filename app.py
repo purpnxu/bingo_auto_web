@@ -1,21 +1,18 @@
 from flask import Flask, render_template, request
-import pandas as pd
 import os
+import pandas as pd
+from sqlalchemy import create_engine
 
 app = Flask(__name__)
 
-CSV_FILE = "bingo_daily_stats_long.csv"
-
-def load_data():
-    if os.path.exists(CSV_FILE):
-        df = pd.read_csv(CSV_FILE, encoding="utf-8-sig")
-        return df
-    else:
-        return pd.DataFrame(columns=["日期","期數","類別","組合號碼","出現次數"])
+DATABASE_URL = os.environ.get("DATABASE_URL")
+engine = create_engine(DATABASE_URL)
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    df = load_data()
+    query = "SELECT * FROM bingo_stats"
+    df = pd.read_sql(query, engine)
+
     results = None
     selected_date = None
     selected_category = "全部"
@@ -23,18 +20,22 @@ def index():
     if request.method == "POST":
         selected_date = request.form.get("date")
         selected_category = request.form.get("category")
-        if selected_date:
-            results = df[df["日期"] == selected_date]
-            if selected_category != "全部":
-                results = results[results["類別"] == selected_category]
-            if results.empty:
-                results = None
+
+        results = df[df["date"] == selected_date]
+
+        if selected_category != "全部":
+            results = results[results["category"] == selected_category]
+
+        if results.empty:
+            results = None
 
     categories = ["全部", "2連號", "3連號", "2同出", "3同出"]
-    return render_template("index.html", results=results, selected_date=selected_date,
-                           selected_category=selected_category, categories=categories)
+    return render_template("index.html",
+                           results=results,
+                           selected_date=selected_date,
+                           selected_category=selected_category,
+                           categories=categories)
 
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=port)
