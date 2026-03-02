@@ -12,7 +12,7 @@ class BingoStats(db.Model):
     combination = db.Column(db.String, nullable=False)
     count = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    
+
     __table_args__ = (
         db.UniqueConstraint("date", "period", "category", "combination", name="unique_stat"),
     )

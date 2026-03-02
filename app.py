@@ -1,9 +1,9 @@
 from flask import Flask, render_template, request
-from flask_sqlalchemy import SQLAlchemy
 from models import db, BingoStats
+import os
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///bingo_stats.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 
@@ -31,4 +31,5 @@ def index():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()  # 確保表存在
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
