@@ -1,40 +1,72 @@
-from flask import Flask, render_template, request
 import os
 import pandas as pd
-from sqlalchemy import create_engine
+from flask import Flask, render_template, request
+from sqlalchemy import create_engine, text
 
 app = Flask(__name__)
 
+# 讀取 Railway 環境變數
 DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL not found. Please set it in Railway Variables.")
+
 engine = create_engine(DATABASE_URL)
+
+
+def create_table_if_not_exists():
+    """確保資料表存在"""
+    with engine.connect() as conn:
+        conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS bingo_stats (
+            id SERIAL PRIMARY KEY,
+            stat_type VARCHAR(50),
+            numbers VARCHAR(50),
+            count INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """))
+        conn.commit()
+
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    query = "SELECT * FROM bingo_stats"
-    df = pd.read_sql(query, engine)
+    create_table_if_not_exists()
 
-    results = None
-    selected_date = None
-    selected_category = "全部"
+    selected_type = request.form.get("stat_type")
 
-    if request.method == "POST":
-        selected_date = request.form.get("date")
-        selected_category = request.form.get("category")
+    try:
+        if selected_type and selected_type != "全部":
+            query = text("""
+                SELECT * FROM bingo_stats
+                WHERE stat_type = :stat_type
+                ORDER BY created_at DESC
+                LIMIT 100
+            """)
+            df = pd.read_sql(query, engine, params={"stat_type": selected_type})
+        else:
+            query = "SELECT * FROM bingo_stats ORDER BY created_at DESC LIMIT 100"
+            df = pd.read_sql(query, engine)
 
-        results = df[df["date"] == selected_date]
+    except Exception as e:
+        return f"資料庫錯誤: {str(e)}"
 
-        if selected_category != "全部":
-            results = results[results["category"] == selected_category]
+    if df.empty:
+        records = []
+    else:
+        records = df.to_dict("records")
 
-        if results.empty:
-            results = None
+    return render_template(
+        "index.html",
+        tables=records,
+        selected_type=selected_type
+    )
 
-    categories = ["全部", "2連號", "3連號", "2同出", "3同出"]
-    return render_template("index.html",
-                           results=results,
-                           selected_date=selected_date,
-                           selected_category=selected_category,
-                           categories=categories)
+
+@app.route("/health")
+def health():
+    return "OK"
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
