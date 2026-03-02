@@ -4,14 +4,19 @@ from flask import Flask
 from models import db, BingoStats
 import os
 
-# Flask app context for SQLAlchemy
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")  # PostgreSQL URI from Railway
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if DATABASE_URL is None:
+    raise ValueError("DATABASE_URL is not set!")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 
 def fetch_latest_data():
-    """替換成你的真實抓資料或 API 邏輯"""
     today = datetime.date.today().strftime("%Y-%m-%d")
     data = {
         "date": [today]*3,
@@ -38,10 +43,10 @@ def update_db():
                 db.session.add(stat)
                 db.session.commit()
             except Exception:
-                db.session.rollback()  # 已存在就跳過
+                db.session.rollback()
         print(f"{datetime.datetime.now()} - DB 更新完成，共 {len(df)} 筆資料")
 
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()  # 第一次自動建表
+        db.create_all()
     update_db()
