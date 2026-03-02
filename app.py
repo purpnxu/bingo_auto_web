@@ -1,73 +1,34 @@
-import os
-import pandas as pd
 from flask import Flask, render_template, request
-from sqlalchemy import create_engine, text
+from flask_sqlalchemy import SQLAlchemy
+from models import db, BingoStats
 
 app = Flask(__name__)
-
-# 讀取 Railway 環境變數
-DATABASE_URL = os.environ.get("DATABASE_URL")
-
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL not found. Please set it in Railway Variables.")
-
-engine = create_engine(DATABASE_URL)
-
-
-def create_table_if_not_exists():
-    """確保資料表存在"""
-    with engine.connect() as conn:
-        conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS bingo_stats (
-            id SERIAL PRIMARY KEY,
-            stat_type VARCHAR(50),
-            numbers VARCHAR(50),
-            count INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """))
-        conn.commit()
-
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///bingo_stats.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db.init_app(app)
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    create_table_if_not_exists()
+    results = None
+    selected_date = None
+    selected_category = "全部"
 
-    selected_type = request.form.get("stat_type")
-
-    try:
-        if selected_type and selected_type != "全部":
-            query = text("""
-                SELECT * FROM bingo_stats
-                WHERE stat_type = :stat_type
-                ORDER BY created_at DESC
-                LIMIT 100
-            """)
-            df = pd.read_sql(query, engine, params={"stat_type": selected_type})
-        else:
-            query = "SELECT * FROM bingo_stats ORDER BY created_at DESC LIMIT 100"
-            df = pd.read_sql(query, engine)
-
-    except Exception as e:
-        return f"資料庫錯誤: {str(e)}"
-
-    if df.empty:
-        records = []
-    else:
-        records = df.to_dict("records")
-
-    return render_template(
-        "index.html",
-        tables=records,
-        selected_type=selected_type
-    )
-
-
-@app.route("/health")
-def health():
-    return "OK"
-
+    if request.method == "POST":
+        selected_date = request.form.get("date")
+        selected_category = request.form.get("category")
+        
+        query = BingoStats.query
+        if selected_date:
+            query = query.filter_by(date=selected_date)
+        if selected_category and selected_category != "全部":
+            query = query.filter_by(category=selected_category)
+        results = query.order_by(BingoStats.created_at.desc()).all()
+    
+    categories = ["全部", "2連號", "3連號", "2同出", "3同出"]
+    return render_template("index.html", results=results, selected_date=selected_date,
+                           selected_category=selected_category, categories=categories)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    with app.app_context():
+        db.create_all()  # 確保表存在
+    app.run(host="0.0.0.0", port=5000, debug=True)
